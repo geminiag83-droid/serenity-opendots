@@ -94,6 +94,21 @@ export function App() {
 
   const [error, setError] = useState('');
   const [auth, setAuth] = useState('');
+  const [remember, setRemember] = useState(false);
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (
+        event.storageArea === localStorage &&
+        (event.key === 'opendots-remembered-token' || event.key === null) &&
+        event.newValue === null
+      ) {
+        setToken('');
+        window.location.reload();
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
   const [needsAuth, setNeedsAuth] = useState(false);
   const [dialog, setDialog] = useState<Dialog>();
   const [mobile, setMobile] = useState(false);
@@ -116,8 +131,10 @@ export function App() {
       setNeedsAuth(false);
       setSelectedDot((previous) => previous || w.dots[0]?.id || '');
     } catch (e) {
-      if (e instanceof ApiError && e.status === 401) setNeedsAuth(true);
-      else
+      if (e instanceof ApiError && e.status === 401) {
+        setToken('');
+        setNeedsAuth(true);
+      } else
         setError(
           e instanceof Error ? e.message : 'Could not connect to the server.',
         );
@@ -203,19 +220,20 @@ export function App() {
     return (
       <main className="unlock">
         <Mascot />
-        <h1>Your own little corner.</h1>
-        <p>
-          Enter the owner access token configured on this template’s server.
-        </p>
+        <h1>Accedi a Serenity OpenDots</h1>
+        <p>Inserisci la chiave di accesso di OpenDots.</p>
         <form
           onSubmit={async (e) => {
             e.preventDefault();
-            setToken(auth);
             try {
+              setToken(auth.trim());
               await api('/state');
+              setToken(auth.trim(), remember);
+              setAuth('');
               setError('');
               await refresh();
             } catch (err) {
+              setToken('');
               setError(
                 err instanceof Error
                   ? err.message
@@ -232,14 +250,26 @@ export function App() {
             onChange={(e) => setAuth(e.target.value)}
             required
           />
-          <button className="primary">Unlock OpenDots</button>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={remember}
+              style={{ width: 'auto', minWidth: 18 }}
+              onChange={(e) => setRemember(e.target.checked)}
+            />
+            Ricordami su questo dispositivo
+          </label>
+          <button className="primary">Accedi</button>
         </form>
         {error && (
           <p className="chat-error" role="alert">
             {error}
           </p>
         )}
-        <p className="muted">The token stays in this tab’s session storage.</p>
+        <p className="muted">
+          Se selezioni Ricordami, la chiave resta salvata in questo browser fino
+          a Esci. Usalo solo sul tuo dispositivo personale.
+        </p>
       </main>
     );
   if (!state || !workspace || !dot)
@@ -424,6 +454,21 @@ export function App() {
           </div>
         )}
         <div className="sidebar-bottom">
+          <button
+            className="nav-item"
+            onClick={() => {
+              if (
+                !window.confirm(
+                  'Uscire e rimuovere la chiave salvata da questo browser?',
+                )
+              )
+                return;
+              setToken('');
+              window.location.reload();
+            }}
+          >
+            <span>Esci / dimentica accesso</span>
+          </button>
           <button
             className={`nav-item ${view === 'tasks' ? 'active' : ''}`}
             onClick={() => {

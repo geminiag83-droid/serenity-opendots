@@ -1,8 +1,46 @@
-let token = sessionStorage.getItem('opendots-token') ?? '';
-export function setToken(value: string) {
+const TOKEN_KEY = 'opendots-token';
+const REMEMBER_KEY = 'opendots-remembered-token';
+function readStoredToken() {
+  try {
+    return (
+      localStorage.getItem(REMEMBER_KEY) ??
+      sessionStorage.getItem(TOKEN_KEY) ??
+      ''
+    );
+  } catch {
+    return '';
+  }
+}
+let token = readStoredToken();
+export function setToken(value: string, remember = false) {
   token = value;
-  if (value) sessionStorage.setItem('opendots-token', value);
-  else sessionStorage.removeItem('opendots-token');
+  // Remove both copies on logout, including credentials saved by an earlier login.
+  try {
+    sessionStorage.removeItem(TOKEN_KEY);
+  } catch {
+    /* Storage unavailable. */
+  }
+  try {
+    localStorage.removeItem(REMEMBER_KEY);
+  } catch {
+    /* Storage unavailable. */
+  }
+  if (!value) return;
+  if (remember) {
+    try {
+      localStorage.setItem(REMEMBER_KEY, value);
+    } catch {
+      throw new Error(
+        'Il browser non consente di ricordare l’accesso. Deseleziona Ricordami e riprova.',
+      );
+    }
+  } else {
+    try {
+      sessionStorage.setItem(TOKEN_KEY, value);
+    } catch {
+      /* Memory-only login. */
+    }
+  }
 }
 export class ApiError extends Error {
   constructor(
